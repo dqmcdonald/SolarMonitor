@@ -1,5 +1,5 @@
 #include <DHT.h>
-#include <Narcoleptic.h>
+//#include <Narcoleptic.h>
 #include <SD.h>
 #include <Wire.h>
 #include "RTClib.h"
@@ -28,14 +28,15 @@ uint32_t syncTime = 0; // time of last sync()
 #define DHTPIN 4     // what pin we're connected to
 
 
-#define LOAD_OUT_CURRENT_PIN A0
+#define LOAD_OUT_CURRENT_PIN A3
 #define PANEL_VOLTAGE_PIN    A1
 #define BATTERY_VOLTAGE_PIN  A2
-#define PANEL_IN_CURRENT_PIN A3
+#define PANEL_IN_CURRENT_PIN A0
 
 
 #define VOLTAGE_DIVIDER_FACTOR  6.0  // Voltage divider
 
+#define NUM_SAMPLES 10 //Take 10 samples for each analog read:
 
 // Uncomment whatever type you're using!
 //#define DHTTYPE DHT11   // DHT 11 
@@ -54,7 +55,7 @@ const int chipSelect = 10;
 File logfile;
 
 // Last log millis:
-uint32_t last_log_time;
+uint32_t next_log_time;
 
 
 void error(char *str)
@@ -136,7 +137,7 @@ void setup(void)
 
   dht.begin();
 
-  last_log_time = millis();
+  next_log_time = millis() + LOG_INTERVAL;
   delay(5000);
 }
 
@@ -148,155 +149,171 @@ void loop(void)
   float panel_current;
   float load_current;
 
-  // Sleep for 60s. This should save power.
-  Narcoleptic.delay(LOG_INTERVAL); // During this time power consumption is minimised
-  delay(10);
-
-
-  last_log_time = millis();
-
-  digitalWrite(greenLEDpin, HIGH);
-
-  // Reading temperature or humidity takes about 250 milliseconds!
-  // Sensor readings may also be up to 2 seconds 'old' (its a very slow sensor)
-  float h = dht.readHumidity();
-  float t = dht.readTemperature();
-
-  // check if returns are valid, if they are NaN (not a number) then something went wrong!
-  if (isnan(t) || isnan(h)) {
-    Serial.println("Failed to read from DHT");
-    digitalWrite(redLEDpin, HIGH);
-  } 
-  else {
+  if( (long)(millis()-next_log_time) >= 0 ) {
 
 
 
-    // log milliseconds since starting
-    uint32_t m = millis();
-    logfile.print(m);           // milliseconds since start
-    logfile.print(", ");    
+    next_log_time = millis() + LOG_INTERVAL;
+
+
+    digitalWrite(greenLEDpin, HIGH);
+
+    // Reading temperature or humidity takes about 250 milliseconds!
+    // Sensor readings may also be up to 2 seconds 'old' (its a very slow sensor)
+    float h = dht.readHumidity();
+    float t = dht.readTemperature();
+
+    // check if returns are valid, if they are NaN (not a number) then something went wrong!
+    if (isnan(t) || isnan(h)) {
+      Serial.println("Failed to read from DHT");
+      digitalWrite(redLEDpin, HIGH);
+    } 
+    else {
+
+
+
+      // log milliseconds since starting
+      uint32_t m = millis();
+      logfile.print(m);           // milliseconds since start
+      logfile.print(", ");    
 #if ECHO_TO_SERIAL
-    Serial.print(m);         // milliseconds since start
-    Serial.print(", ");  
+      Serial.print(m);         // milliseconds since start
+      Serial.print(", ");  
 #endif
 
-    // fetch the time
-    now = RTC.now();
-   
-    // log time
-    logfile.print(now.unixtime()); // seconds since 1/1/1970
-    logfile.print(", ");
-    logfile.print('"');
-    logfile.print(now.year(), DEC);
-    logfile.print("/");
-    logfile.print(now.month(), DEC);
-    logfile.print("/");
-    logfile.print(now.day(), DEC);
-    logfile.print(" ");
-    logfile.print(now.hour(), DEC);
-    logfile.print(":");
-    logfile.print(now.minute(), DEC);
-    logfile.print(":");
-    logfile.print(now.second(), DEC);
-    logfile.print('"');
+      // fetch the time
+      now = RTC.now();
+
+      // log time
+      logfile.print(now.unixtime()); // seconds since 1/1/1970
+      logfile.print(", ");
+      logfile.print('"');
+      logfile.print(now.year(), DEC);
+      logfile.print("/");
+      logfile.print(now.month(), DEC);
+      logfile.print("/");
+      logfile.print(now.day(), DEC);
+      logfile.print(" ");
+      logfile.print(now.hour(), DEC);
+      logfile.print(":");
+      logfile.print(now.minute(), DEC);
+      logfile.print(":");
+      logfile.print(now.second(), DEC);
+      logfile.print('"');
 #if ECHO_TO_SERIAL
-    Serial.print(now.unixtime()); // seconds since 1/1/1970
-    Serial.print(", ");
-    Serial.print('"');
-    Serial.print(now.year(), DEC);
-    Serial.print("/");
-    Serial.print(now.month(), DEC);
-    Serial.print("/");
-    Serial.print(now.day(), DEC);
-    Serial.print(" ");
-    Serial.print(now.hour(), DEC);
-    Serial.print(":");
-    Serial.print(now.minute(), DEC);
-    Serial.print(":");
-    Serial.print(now.second(), DEC);
-    Serial.print('"');
+      Serial.print(now.unixtime()); // seconds since 1/1/1970
+      Serial.print(", ");
+      Serial.print('"');
+      Serial.print(now.year(), DEC);
+      Serial.print("/");
+      Serial.print(now.month(), DEC);
+      Serial.print("/");
+      Serial.print(now.day(), DEC);
+      Serial.print(" ");
+      Serial.print(now.hour(), DEC);
+      Serial.print(":");
+      Serial.print(now.minute(), DEC);
+      Serial.print(":");
+      Serial.print(now.second(), DEC);
+      Serial.print('"');
 #endif //ECHO_TO_SERIAL
 
 
 
 
-    logfile.print(", ");    
-    logfile.print(t);
-    logfile.print(", ");    
-    logfile.print(h);
+      logfile.print(", ");    
+      logfile.print(t);
+      logfile.print(", ");    
+      logfile.print(h);
 #if ECHO_TO_SERIAL
-    Serial.print(", ");   
-    Serial.print(t);
-    Serial.print(", ");    
-    Serial.print(h);
+      Serial.print(", ");   
+      Serial.print(t);
+      Serial.print(", ");    
+      Serial.print(h);
 #endif //ECHO_TO_SERIAL
 
 
-    panel_voltage = getVoltage( PANEL_VOLTAGE_PIN );
-    logfile.print(", ");
-    logfile.print(panel_voltage);
+      panel_voltage = getVoltage( PANEL_VOLTAGE_PIN );
+      logfile.print(", ");
+      logfile.print(panel_voltage);
 #if ECHO_TO_SERIAL
-    Serial.print(", ");   
-    Serial.print(panel_voltage, DEC);
+      Serial.print(", ");   
+      Serial.print(panel_voltage, DEC);
 #endif // ECHO_TO_SERIAL
 
-    battery_voltage = getVoltage( BATTERY_VOLTAGE_PIN );
-    logfile.print(", ");
-    logfile.print(battery_voltage);
+      battery_voltage = getVoltage( BATTERY_VOLTAGE_PIN );
+      logfile.print(", ");
+      logfile.print(battery_voltage);
 #if ECHO_TO_SERIAL
-    Serial.print(", ");   
-    Serial.print(battery_voltage, DEC);
+      Serial.print(", ");   
+      Serial.print(battery_voltage, DEC);
 #endif // ECHO_TO_SERIAL
 
 
-    panel_current = getCurrent( PANEL_IN_CURRENT_PIN );
-    logfile.print(", ");
-    logfile.print(panel_current);
+      panel_current = getCurrent( PANEL_IN_CURRENT_PIN );
+      logfile.print(", ");
+      logfile.print(panel_current);
 #if ECHO_TO_SERIAL
-    Serial.print(", ");   
-    Serial.print(panel_current, DEC);
+      Serial.print(", ");   
+      Serial.print(panel_current, DEC);
 #endif // ECHO_TO_SERIAL
 
-    load_current = getCurrent( LOAD_OUT_CURRENT_PIN );
-    logfile.print(", ");
-    logfile.print(load_current);
+      load_current = getCurrent( LOAD_OUT_CURRENT_PIN );
+      logfile.print(", ");
+      logfile.print(load_current);
 #if ECHO_TO_SERIAL
-    Serial.print(", ");   
-    Serial.print(load_current, DEC);
+      Serial.print(", ");   
+      Serial.print(load_current, DEC);
 #endif // ECHO_TO_SERIAL
 
-    logfile.println();
+      logfile.println();
 #if ECHO_TO_SERIAL
-    Serial.println();
+      Serial.println();
 #endif // ECHO_TO_SERIAL
 
-    digitalWrite(greenLEDpin, LOW);
+      digitalWrite(greenLEDpin, LOW);
 
-    // blink LED to show we are syncing data to the card & updating FAT!
-    digitalWrite(redLEDpin, HIGH);
-    logfile.flush();
-    digitalWrite(redLEDpin, LOW);
+      // blink LED to show we are syncing data to the card & updating FAT!
+      digitalWrite(redLEDpin, HIGH);
+      logfile.flush();
+      digitalWrite(redLEDpin, LOW);
+    }
+
+  } else {
+   delay(10); 
   }
-  // }
 }
 
 // Return a voltage and correct for the voltage divider
 float getVoltage(int pin) {
-  int vin = analogRead(pin); 
-  delay(10);
-  float voltage = (float)5.0*vin/1024.0 * VOLTAGE_DIVIDER_FACTOR;  
+  int vin=0;
+  int i;
+  for( i=0; i< NUM_SAMPLES; i++ ) {
+    vin += analogRead(pin); 
+    delay(10); 
+  }
+  vin = vin / NUM_SAMPLES;
+  float voltage = (float)5.0*vin/1023.0 * VOLTAGE_DIVIDER_FACTOR;  
   return voltage;
 }
 
 // Calculate the current flowing from the Hall effect sensor at the attached pin:
 float getCurrent( int pin ) {
-  int vin = analogRead(pin); 
-  delay(10); 
+  int vin=0;
+  int i;
+  for( i=0; i< NUM_SAMPLES; i++ ) {
+    vin += analogRead(pin); 
+    delay(10); 
+  }
+  vin = vin / NUM_SAMPLES;
+
   // Convert to current. First subtract the midpoint of 2.5, then divide by 0.185 to 
   // convert volts to amps: 
-  float current = ((5.0*vin/1024.0)-2.5)/0.185;
+  float current = ((5.0*vin/1023.0)-2.5)/0.185;
   return current;
 }
+
+
 
 
 
