@@ -29,8 +29,8 @@ uint32_t syncTime = 0; // time of last sync()
 
 
 #define LOAD_OUT_CURRENT_PIN A3
-#define PANEL_VOLTAGE_PIN    A1
-#define BATTERY_VOLTAGE_PIN  A2
+#define PANEL_VOLTAGE_PIN    A2
+#define BATTERY_VOLTAGE_PIN  A1
 #define PANEL_IN_CURRENT_PIN A0
 
 
@@ -233,7 +233,7 @@ void loop(void)
 #endif //ECHO_TO_SERIAL
 
 
-      panel_voltage = getVoltage( PANEL_VOLTAGE_PIN );
+      panel_voltage = getPanelVoltage( PANEL_VOLTAGE_PIN );
       logfile.print(", ");
       logfile.print(panel_voltage);
 #if ECHO_TO_SERIAL
@@ -241,7 +241,7 @@ void loop(void)
       Serial.print(panel_voltage, DEC);
 #endif // ECHO_TO_SERIAL
 
-      battery_voltage = getVoltage( BATTERY_VOLTAGE_PIN );
+      battery_voltage = getBatteryVoltage( BATTERY_VOLTAGE_PIN );
       logfile.print(", ");
       logfile.print(battery_voltage);
 #if ECHO_TO_SERIAL
@@ -285,7 +285,7 @@ void loop(void)
 }
 
 // Return a voltage and correct for the voltage divider
-float getVoltage(int pin) {
+float getBatteryVoltage(int pin) {
   int vin=0;
   int i;
   for( i=0; i< NUM_SAMPLES; i++ ) {
@@ -296,6 +296,22 @@ float getVoltage(int pin) {
   float voltage = (float)5.0*vin/1023.0 * VOLTAGE_DIVIDER_FACTOR;  
   return voltage;
 }
+
+// Return panel voltage, indirectly via optoisolater.
+// This is not the actual panel voltage but will give some idea
+// of whether the panel is active:
+float getPanelVoltage(int pin) {
+  int vin=0;
+  int i;
+  for( i=0; i< NUM_SAMPLES; i++ ) {
+    vin += analogRead(pin); 
+    delay(10); 
+  }
+  vin = vin / NUM_SAMPLES;
+  float voltage = (float)5.0*vin/1023.0;
+  return voltage;
+}
+
 
 // Calculate the current flowing from the Hall effect sensor at the attached pin:
 float getCurrent( int pin ) {
