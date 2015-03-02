@@ -9,7 +9,7 @@
 // Temperature and humidity are also logged
 
 // how many milliseconds between grabbing data and logging it. 1000 ms is once a second
-#define LOG_INTERVAL  30000 // mills between entries (reduce to take more/faster data)
+#define LOG_INTERVAL  60000 // mills between entries (reduce to take more/faster data)
 
 // how many milliseconds before writing the logged data permanently to disk
 // set it to the LOG_INTERVAL to write each time (safest)
@@ -21,12 +21,14 @@ uint32_t syncTime = 0; // time of last sync()
 #define ECHO_TO_SERIAL   0 // echo data to serial port
 #define WAIT_TO_START    0 // Wait for serial input in setup()
 
-// the digital pins that connect to the LEDs
+// the digital pins that connect to the signal LEDs
 #define redLEDpin 2
 #define greenLEDpin 3
 
 #define DHTPIN 4     // what pin we're connected to
 
+#define PUSHBUTTON_PIN 7  // A push button to control the LED lamps
+#define LED_CONTROL_PIN 6  // Used to control the LED lamps
 
 #define LOAD_OUT_CURRENT_PIN A3
 #define PANEL_VOLTAGE_PIN    A2
@@ -58,6 +60,11 @@ File logfile;
 uint32_t next_log_time;
 
 
+int panel_on_count = 0;
+const double PANEL_VOLTAGE_THRESHOLD=0.40;
+const int PANEL_COUNT_THRESHOLD = 5; // If the panel is off for five samples then 
+                                     // turn on the LED lamps
+
 void error(char *str)
 {
   Serial.print("error: ");
@@ -80,6 +87,12 @@ void setup(void)
   pinMode(  BATTERY_VOLTAGE_PIN, INPUT );
   pinMode( PANEL_IN_CURRENT_PIN , INPUT );
   pinMode( LOAD_OUT_CURRENT_PIN , INPUT );
+
+  pinMode( LED_CONTROL_PIN, OUTPUT );
+  digitalWrite( LED_CONTROL_PIN, LOW );
+
+  pinMode( PUSHBUTTON_PIN, INPUT );
+  digitalWrite( PUSHBUTTON_PIN, HIGH );
 
 #if WAIT_TO_START
   Serial.println("Type any character to start");
@@ -150,8 +163,6 @@ void loop(void)
   float load_current;
 
   if( (long)(millis()-next_log_time) >= 0 ) {
-
-
 
     next_log_time = millis() + LOG_INTERVAL;
 
@@ -279,8 +290,28 @@ void loop(void)
       digitalWrite(redLEDpin, LOW);
     }
 
-  } else {
-   delay(10); 
+    if( panel_voltage > PANEL_VOLTAGE_THRESHOLD ) {
+      panel_on_count+= 1;
+    } 
+    else {
+      panel_on_count = 0; 
+    }
+
+    if( panel_on_count > PANEL_COUNT_THRESHOLD ) {
+      digitalWrite(LED_CONTROL_PIN, HIGH );
+      Serial.println("LEDs on");
+    } 
+    else {
+      digitalWrite(LED_CONTROL_PIN, LOW ); 
+    }
+
+
+
+
+  } 
+
+  else {
+    delay(10); 
   }
 }
 
@@ -328,6 +359,9 @@ float getCurrent( int pin ) {
   float current = ((5.0*vin/1023.0)-2.5)/0.185;
   return current;
 }
+
+
+
 
 
 
