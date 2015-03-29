@@ -11,6 +11,15 @@
 // how many milliseconds between grabbing data and logging it. 1000 ms is once a second
 #define LOG_INTERVAL  60000 // mills between entries (reduce to take more/faster data)
 
+// Next log millis:
+uint32_t next_log_time;
+
+// Number of hours (in milliseconds) the LED lamps should light for at night.
+#define NUMBER_LED_LAMP_HOURS 3 
+long lamp_off_time = 0;
+
+bool solar_panel_off = false;
+
 // how many milliseconds before writing the logged data permanently to disk
 // set it to the LOG_INTERVAL to write each time (safest)
 // set it to 10*LOG_INTERVAL to write all data every 10 datareads, you could lose up to 
@@ -56,14 +65,11 @@ const int chipSelect = 10;
 // the logging file
 File logfile;
 
-// Last log millis:
-uint32_t next_log_time;
 
 
-int panel_on_count = 0;
+int panel_off_count = 0;
 const double PANEL_VOLTAGE_THRESHOLD=0.40;
-const int PANEL_COUNT_THRESHOLD = 5; // If the panel is off for five samples then 
-                                     // turn on the LED lamps
+const int PANEL_COUNT_THRESHOLD = 2; // If the panel is off for five samples then 
 
 void error(char *str)
 {
@@ -98,6 +104,8 @@ void setup(void)
   Serial.println("Type any character to start");
   while (!Serial.available());
 #endif //WAIT_TO_START
+
+
 
   // initialize the SD card
   Serial.print("Initializing SD card...");
@@ -291,24 +299,74 @@ void loop(void)
     }
 
     if( panel_voltage > PANEL_VOLTAGE_THRESHOLD ) {
-      panel_on_count+= 1;
+      if( !solar_panel_off ) {
+        panel_off_count+= 1;
+#if ECHO_TO_SERIAL
+        Serial.print("Incrementing panel off count, value is now: ");
+        Serial.print( panel_off_count, DEC );
+        Serial.println();
+#endif // ECHO_TO_SERIAL
+      }
     } 
     else {
-      panel_on_count = 0; 
+      panel_off_count = 0;
+#if ECHO_TO_SERIAL
+      Serial.print("Resetting panel off count, value is now: ");
+      Serial.print( panel_off_count, DEC );
+      Serial.println();
+#endif // ECHO_TO_SERIAL
     }
 
-    if( panel_on_count > PANEL_COUNT_THRESHOLD ) {
-      digitalWrite(LED_CONTROL_PIN, HIGH );
-      Serial.println("LEDs on");
+    // Only run the LED lamps for a fixed number of hours - check the time if the 
+    // solar panel is off:
+    if( solar_panel_off ) {
+#if ECHO_TO_SERIAL  
+      Serial.print("Checking for time out, current hour = " );
+      Serial.print( now.hour(), DEC );
+      Serial.print(" timeout time = " );
+      Serial.println( lamp_off_time, DEC );
+#endif
+      if( now.hour() > lamp_off_time ) {
+#if ECHO_TO_SERIAL      
+        Serial.println("LEDS timed out, turning off");
+#endif  
+        digitalWrite(LED_CONTROL_PIN, LOW ); 
+      }
+    }
+
+    // The solar panel has been off for the specified number of monitoring periods
+    // Turn on the LED lamps and record the time intervale to turn them off
+    if( panel_off_count > PANEL_COUNT_THRESHOLD  ) {
+#if ECHO_TO_SERIAL      
+      Serial.print("Panel count above threshold: ");
+      Serial.println(panel_off_count, DEC );
+#endif  
+      if( ! solar_panel_off ) {
+        digitalWrite(LED_CONTROL_PIN, HIGH );
+        solar_panel_off = true;
+        lamp_off_time = now.hour() + NUMBER_LED_LAMP_HOURS;
+        if (lamp_off_time > 24 )
+          lamp_off_time = 24;
+#if ECHO_TO_SERIAL
+        Serial.print("Turning on LEDs, off time =  ");
+        Serial.println(lamp_off_time, DEC );
+#endif 
+      }
     } 
     else {
       digitalWrite(LED_CONTROL_PIN, LOW ); 
+      solar_panel_off = false;
+      lamp_off_time = 0;
+#if ECHO_TO_SERIAL
+      Serial.println("Panel on again, turning off LEDs");
+
+#endif 
     }
+  }
 
 
 
 
-  } 
 
   else {
     delay(10); 
@@ -359,6 +417,14 @@ float getCurrent( int pin ) {
   float current = ((5.0*vin/1023.0)-2.5)/0.185;
   return current;
 }
+
+
+
+
+
+
+
+
 
 
 
